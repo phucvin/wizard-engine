@@ -1,0 +1,52 @@
+class Signature(params: Array<Type>, results: Array<Type>) {
+}
+
+class Type {
+}
+
+class IntType(width: byte) extends Type {
+	private def arr_i = Array<Type>.new(1);
+	private def arr_ii = Array<Type>.new(2);
+	def ii_z = Signature.new(arr_ii, TypeCache.TYPES_z);
+	def ii_i = Signature.new(arr_ii, arr_i);
+	
+	new() {
+		arr_ii[0] = this;
+		arr_ii[1] = this;
+		arr_i[0] = this;
+	}
+}
+
+class FloatType(width: byte) extends Type {
+	private def arr_f = Array<Type>.new(1);
+	private def arr_ff = Array<Type>.new(2);
+	def ff_z = Signature.new(arr_ff, TypeCache.TYPES_z);
+	def ff_f = Signature.new(arr_ff, arr_f);
+	def f_f = Signature.new(arr_f, arr_f);
+	
+	new() {
+		arr_ff[0] = this;
+		arr_ff[1] = this;
+		arr_f[0] = this;
+	}
+}
+
+class V128Type extends Type {
+}
+
+class BoolType extends Type {
+}
+
+component TypeCache {
+	def TYPE_int = IntType.new(32);
+	def TYPE_long = IntType.new(64);
+	def TYPE_float = FloatType.new(32);
+	def TYPE_double = FloatType.new(64);
+	def TYPE_bool = BoolType.new();
+	def TYPE_v128 = V128Type.new();
+
+	def TYPES_none: Array<Type> = [];
+	def TYPES_z: Array<Type> = [TYPE_bool];
+
+	def sig_ii_i = TYPE_int.ii_i;
+}

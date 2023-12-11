@@ -1,0 +1,28 @@
+class Node {
+	var control: Control;
+	var effect: Effect;
+	var op: Operator;
+	var sig: Signature;
+	var facts: Fact.set;
+	var inputs: NodeRefs;
+}
+
+class NodeRef(var node: Node, var index: u16) { }
+class NodeRefs(nodes: Array<(Node, u16)>) { }
+
+type Control {
+	case Pure;
+	case Start;
+	case Linked(prev: NodeRef, next: NodeRef);
+	case Merge(inputs: NodeRefs);
+	case Split(input: NodeRef);
+	case End(inputs: NodeRefs);
+}
+
+type Effect {
+	case Pure;
+	case Start;
+	case Read(state: NodeRef);
+	case Write(state: NodeRef, anti: NodeRefs);
+	case Any(state: NodeRef, anti: NodeRefs);
+}

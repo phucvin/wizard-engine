@@ -1,0 +1,105 @@
+// Represents the statically-known part of an operation, not including the types.
+// XXX: rename types to {typ}?
+type Operator {
+	// Graph meta-operators
+	case Dead;
+	case Start;
+	case Block;
+	case Param(t: Type, index: int);
+	case Merge(count: int);
+	case Phi(t: Type, count: int);
+	case If;
+	case Switch(count: int);
+	case Throw;
+	case Return(t: Array<Type>);
+	case End;
+	// Constants
+	case I32Const(x: int);
+	case I64Const(x: i64);
+	case F32Const(x: u32);
+	case F64Const(x: u64);
+	case ObjConst(x: Object);
+	case I31Const(x: i31);
+	case V128Const(x: (u64, u64));
+	// Wasm-level operators: memories
+	case WasmLoad(t: ValueType, memindex: int, offset: u32);
+	case WasmStore(t: ValueType, memindex: int, offset: u32);
+	case WasmMemorySize(memindex: int);
+	case WasmMemoryGrow(memindex: int);
+	// Wasm-level operators: GC structs
+	case WasmStructGet(decl: StructDecl, field_index: int);
+	case WasmStructSet(decl: StructDecl, field_index: int);
+	case WasmStructNew(decl: StructDecl);
+	case WasmStructNewDefault(decl: StructDecl);
+	// Wasm-level operators: GC arrays
+	// Wasm-level operators: calls
+	// Wasm-level operators: tables
+	// Machine-level operators: i32
+	case I32Eq;
+	case I32LtS;
+	case I32LtU;
+	case I32LteqS;
+	case I32LteqU;
+	case I32Add;
+	case I32Sub;
+	case I32Mul;
+	case I32Div;
+	case I32And;
+	case I32Or;
+	case I32Xor;
+	case I32Shl;
+	case I32Shr;
+	case I32Sar;
+	// Machine-level operators: i64
+	case I64Eq;
+	case I64LtS;
+	case I64LtU;
+	case I64LteqS;
+	case I64LteqU;
+	case I64Add;
+	case I64Sub;
+	case I64Mul;
+	case I64Div;
+	case I64And;
+	case I64Or;
+	case I64Xor;
+	case I64Shl;
+	case I64Shr;
+	case I64Sar;
+	// Machine-level operators: f32
+	case F32Eq;
+	case F32Lt;
+	case F32Lteq;
+	case F32Add;
+	case F32Sub;
+	// Machine-level operators: f64
+	case F64Eq;
+	case F64Lt;
+	case F64Lteq;
+	case F64Add;
+	case F64Sub;
+	// Machine-level operators: pointers
+	case PtrEq;
+	case PtrLt;
+	case PtrLteq;
+	case PtrAdd;
+	case PtrSub;
+	case PtrLoad;
+	case PtrStore;
+	case PtrCmpSwp;
+	// Machine-level operators: calls
+	case Call;
+	case CallVirgil;
+	case ReturnCall;
+}
+
+// Computes the initial facts, signature, including parameter and result types.
+def initial(op: Operator) -> (Fact.set, Signature) {
+	def N: Fact.set = Facts.O_NONE;
+	def P: Fact.set = Facts.O_PURE;
+	def F: Fact.set = Fact.O_FOLDABLE;
+	def C: Fact.set = Fact.O_COMMUTATIVE;
+	def A: Fact.set = Fact.O_ASSOCIATIVE;
+	match (op) {
+	}
+}

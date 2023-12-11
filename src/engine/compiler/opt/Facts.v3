@@ -1,0 +1,32 @@
+enum Fact {
+	UNUSED,                 // prevent some compiler bugs
+	// facts for fields
+	F_VALUE,		// field is read-only
+	F_NORM,			// the field is an element of a normalized field
+	// facts for methods
+	M_INLINE,		// method should be inlined whenever possible
+	M_NEVER_INLINE,		// method should never be inlined
+	M_EMPTY,		// method has no body (should throw)
+	// facts for values
+	V_ZERO,			// == 0 (or null)
+	V_NON_ZERO,		// != 0 (or null)
+	V_BELOW_ZERO,		// < 0
+	V_NON_NEGATIVE,		// >= 0
+	// facts for operators
+	O_PURE,			// no side-effects + deterministic
+	O_FOLDABLE,		// can be constant folded
+	O_COMMUTATIVE,		// f(x, y) == f(y, x)
+	O_ASSOCIATIVE,		// f(f(x, y), z) == f(x, f(y, z))
+	O_NO_NULL_CHECK,	// x != null, x != NaN for floats
+	O_NO_BOUNDS_CHECK,	// no bounds check required
+	O_NO_ZERO_CHECK,	// y != 0
+	O_NO_NEGATIVE_CHECK,	// x >= 0
+	O_NO_DIV_CHECK,		// x != Int.MIN || y != -1
+	O_KILLED		// instruction is dead
+}
+
+component Facts {
+	def O_NONE: Fact.set;
+	def O_PURE: Fact.set = Fact.O_PURE | Fact.O_FOLDABLE;
+	def O_SAFE_ARRAY = Fact.O_NO_NULL_CHECK | Fact.O_NO_BOUNDS_CHECK;
+}
