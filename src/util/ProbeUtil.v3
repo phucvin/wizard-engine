@@ -136,3 +136,57 @@ class SamplingProbe(probe: Probe) extends Probe {
 		//   <end of func>
 	}
 }
+
+class CallTraceProbe(tail: bool, index: u31) extends Probe {
+	def fire(dynamicLoc: DynamicLoc) -> Resumption {
+		var instance = dynamicLoc.func.instance;
+		var target = instance.functions[index];
+		var accessor = dynamicLoc.frame.getFrameAccessor();
+		printCall(if(tail, "return_call", "call"), dynamicLoc, target.sig, 0, target, accessor);
+		return Resumption.Continue;
+	}
+}
+
+class CallIndirectTraceProbe(tail: bool, table_index: u31, sig_index: u31) extends Probe {
+	def fire(dynamicLoc: DynamicLoc) -> Resumption {
+		var instance = dynamicLoc.func.instance;
+		var accessor = dynamicLoc.frame.getFrameAccessor();
+		var table = instance.tables[table_index];
+		var target_index = Values.v_u(accessor.getTopOfStack());
+		if (target_index >= table.funcs.length) return Resumption.Continue; // will trap
+		var target = table.funcs[target_index];
+		printCall(if(tail, "return_call_indirect", "call_indirect"), dynamicLoc, SigDecl.!(instance.heaptypes[sig_index]), 1, target, accessor);
+		return Resumption.Continue;
+	}
+}
+
+class CallRefTraceProbe(tail: bool, sig_index: u31) extends Probe {
+	def fire(dynamicLoc: DynamicLoc) -> Resumption {
+		var instance = dynamicLoc.func.instance;
+		var accessor = dynamicLoc.frame.getFrameAccessor();
+		var target = Function.!(Value.Ref.!(accessor.getTopOfStack()).val);
+		printCall(if(tail, "return_call_ref", "call_ref"), dynamicLoc, SigDecl.!(instance.heaptypes[sig_index]), 1, target, accessor);
+		return Resumption.Continue;
+	}
+}
+
+def printCall(mnemonic: string, dynamicLoc: DynamicLoc, sig: SigDecl, receiver: int, target: Function, accessor: FrameAccessor) {
+	Trace.OUT.indent(accessor.depth());
+	Trace.OUT
+		.mark()
+		.put1("+%d: ", dynamicLoc.pc)
+		.rjustify_mark(8);
+	Trace.OUT.puts(mnemonic);
+	Trace.OUT.puts("(");
+	var arity = sig.params.length + receiver;
+	var base = 1 - arity;
+	for (i < arity) {
+		var val = accessor.getOperand(base + i);
+		if (i > 0) Trace.OUT.csp();
+		Values.render(val, Trace.OUT);
+	}
+	Trace.OUT.puts(") -> ");
+	if (target == null) Trace.OUT.puts("null");
+	else target.render(Trace.OUT);
+	Trace.OUT.outln();
+}
