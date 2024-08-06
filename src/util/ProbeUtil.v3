@@ -68,6 +68,7 @@ class TraceProbe extends Probe {
 		if (Trace.operands) {
 			out.sp();
 			out.ljustify_mark(24);
+			Trace.OUT.flush();
 			out.puts("|");
 			for (i < accessor.numLocals()) {
 				out.sp().putv(accessor.getLocal(i));
