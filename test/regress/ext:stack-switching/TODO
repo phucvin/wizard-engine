@@ -1,3 +1,10 @@
+- typechecking tests
+  - cont.new
+  - resume
+  - resume_throw
+  - suspend
+  - handlers
+  - cont.bind
 - passing parameters of GC types
 - order of arguments to resumes
 - resume.throw instruction
@@ -5,3 +12,5 @@
 - suspends
 - nested suspends
 - matching of tags for a suspend
+- throwing + catching on another stack
+- repeat all exception handling tests and systematically split the stacks?
