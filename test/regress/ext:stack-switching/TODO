@@ -1,0 +1,7 @@
+- passing parameters of GC types
+- order of arguments to resumes
+- resume.throw instruction
+- chains of resumes
+- suspends
+- nested suspends
+- matching of tags for a suspend
