@@ -56,8 +56,18 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 	def readFuncIndex() -> u31 {
 		return readAndCheckIndex("function", module.functions.length).1;
 	}
-	def readMemoryRef() -> MemoryDecl {
-		return readIndex("memory", module.memories);
+	def readMemoryRef(multiMem: bool) -> MemoryDecl {
+		var pt = decoder.pos;
+		var index: u31;
+		if (multiMem) {
+			index = readMemoryIndex();
+		} else {
+			var b = readByte("memory index", StringBuilder.putd);
+			if (b != 0) err.rel(decoder, pt).ExpectedMemoryIndexZeroByte(b);
+			index = 0;
+		}
+		var t = checkIndex(pt, "memory", index, module.memories.length);
+		return if(t.0, module.memories[t.1]);
 	}
 	def readMemoryIndex() -> u31 {
 		return readAndCheckIndex("memory", module.memories.length).1;
@@ -69,17 +79,6 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 	}
 	def readElemRef() -> ElemDecl {
 		return readIndex("elem", module.elems);
-	}
-	def readMemoryImm() -> int {
-		var pt = decoder.pos;
-		if (extensions.MULTI_MEMORY) {
-			return readMemoryIndex();
-		} else {
-			var b = readByte("memory index", StringBuilder.putd);
-			if (b != 0) err.rel(decoder, pt).ExpectedMemoryIndexZeroByte(b);
-			checkIndex(pt, "memory", 0, module.memories.length);
-			return 0;
-		}
 	}
 	def readGlobalRef() -> GlobalDecl {
 		return readIndex("global", module.globals);
@@ -121,6 +120,7 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 			BpTypeCode.FUNCREF.val => return ValueTypes.FUNCREF;
 			BpTypeCode.EXTERNREF.val => return ValueTypes.EXTERNREF;
 			BpTypeCode.ANYREF.val => if (extensions.GC) return ValueTypes.ANYREF;
+			BpTypeCode.EQREF.val => if (extensions.GC) return ValueTypes.EQREF;
 			BpTypeCode.REF.val => return ValueType.Ref(false, readHeapType());
 			BpTypeCode.REF_NULL.val => return ValueType.Ref(true, readHeapType());
 			BpTypeCode.STRUCTREF.val => if (extensions.GC) return ValueTypes.STRUCTREF;
@@ -130,6 +130,7 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 			BpTypeCode.ARRAYREF.val => if (extensions.GC) return ValueTypes.ARRAYREF;
 			BpTypeCode.EXNREF.val => if (extensions.EXCEPTION_HANDLING) return ValueTypes.EXNREF;
 			BpTypeCode.NULLREF.val => if (extensions.GC) return ValueTypes.NULLREF;
+			BpTypeCode.CONTREF.val => if (extensions.STACK_SWITCHING) return ValueTypes.CONTREF;
 		}
 
 		err.rel(decoder, pt).InvalidValueTypecon(code);
@@ -149,6 +150,7 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 			BpTypeCode.ARRAYREF.val => return ValueTypes.ARRAYREF;
 			BpTypeCode.EXNREF.val => return ValueTypes.EXNREF;
 			BpTypeCode.NULLREF.val => return ValueTypes.NULLREF;
+			BpTypeCode.CONTREF.val => return ValueTypes.CONTREF;
 			BpTypeCode.REF.val => return ValueType.Ref(false, readHeapType());
 			BpTypeCode.REF_NULL.val => return ValueType.Ref(true, readHeapType());
 		}
@@ -166,6 +168,7 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 			BpHeapTypeCode.EQ.val => if (extensions.GC) return HeapType.EQ;
 			BpHeapTypeCode.I31.val => if (extensions.GC) return HeapType.I31;
 			BpHeapTypeCode.NOFUNC.val => if (extensions.GC) return HeapType.NOFUNC;
+			BpHeapTypeCode.NOCONT.val => if (extensions.STACK_SWITCHING) return HeapType.NOCONT;
 			BpHeapTypeCode.NOEXTERN.val => if (extensions.GC) return HeapType.NOEXTERN;
 			BpHeapTypeCode.STRUCT.val => if (extensions.GC) return ValueTypes.STRUCTREF.heap;
 			BpHeapTypeCode.ARRAY.val => if (extensions.GC) return ValueTypes.ARRAYREF.heap;
@@ -252,6 +255,11 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 		}
 		return val;
 	}
+	def readU32orU64(is64: bool, quantity: string, max: u64) -> u64 {
+		return if(is64,
+			readU64(quantity, max),
+			readU32("initial", if (max > u32.max, u32.max, u32.!(max))));
+	}
 	def readUtf8String(quantity: string) -> string {
 		var len = readU32_i("string length", limits.max_module_size);
 		var pt = decoder.pos;
@@ -322,6 +330,9 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 			BpTypeCode.NULLREF.val => if (extensions.GC) {
 				return (SigCache.arr_v, [ValueTypes.NULLREF]);
 			}
+			BpTypeCode.CONTREF.val => if (extensions.STACK_SWITCHING) {
+				return (SigCache.arr_v, SigCache.arr_c);
+			}
 		}
 		decoder.at(pt); // backup and try again as full signed LEB
 		var index = decoder.read_sleb32();
@@ -347,18 +358,21 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 	}
 	def readHandlers() -> Array<(u32, u32)> {
 		var pt = decoder.pos;
-		var count = readU32("handler count", limits.max_func_size);
+		var count = readU32("ex handler count", limits.max_func_size);
 		var result = Array<(u32, u32)>.new(int.!(count));
 		for (i < count) result[i] = (decoder.read_uleb32(), decoder.read_uleb32());
 		return result;
 	}
 	// Reads the same content as readHandlers but with extra checks.
-	def readContHandlers() -> Array<ContHandler> {
+	def readSusHandlers() -> Array<SusHandler> {
 		var pt = decoder.pos;
-		var count = readU32("cont handler count", limits.max_func_size);
-		var result = Array<ContHandler>.new(int.!(count));
+		var count = readU32("sus handler count", limits.max_func_size);
+		var result = Array<SusHandler>.new(int.!(count));
 		for (i < count) {
-			var ch = ContHandler(readTagRef(), readLabel());
+			var kind = readU32("sus handler kind", 1);
+			var ch: SusHandler;
+			if (kind == 0) ch = SusHandler.Suspend(readTagRef(), readLabel());
+			else ch = SusHandler.Switch(readTagRef());
 			result[i] = ch;
 		}
 		return result;
@@ -398,7 +412,7 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 			checkIndex(pt, "memory", 0, module.memories.length);
 		}
 		var offset: u64;
-		if (mem_index < module.memories.length && module.memories[mem_index].indexType == ValueType.I64) {
+		if (mem_index < module.memories.length && module.memories[mem_index].size.is64) {
 			offset = readU64("memarg offset", u64.max);
 		} else {
 			offset = readU32("memarg offset", u32.max);
@@ -512,6 +526,7 @@ class WasmParser(extensions: Extension.set, limits: Limits, module: Module,
 }
 type Catch(tag: TagDecl, exnref: bool, depth: u32) {
 }
-type ContHandler(tag: TagDecl, depth: u32) {
-
+type SusHandler {
+	case Suspend(t: TagDecl, depth: u32);
+	case Switch(t: TagDecl);
 }

@@ -25,8 +25,8 @@ component Execute {
 }
 
 type StackSwitchInfo {
-	case Suspend(cont: Continuation, tagdef: Tag, vals: Array<Value>) {}
-	case RunChildStack(target: WasmStack) {}
+	case Suspend(top: WasmStack, tagdef: Tag, vals: Array<Value>) {}
+	case RunChildStack(cont: Continuation) {}
 }
 
 type Result {
@@ -76,7 +76,7 @@ type Result {
 			if (StackSwitchInfo.RunChildStack.?(a.info) && StackSwitchInfo.RunChildStack.?(b.info)) {
 				var info_a = StackSwitchInfo.RunChildStack.!(a.info);
 				var info_b = StackSwitchInfo.RunChildStack.!(b.info);
-				return info_a.target == info_b.target;
+				return info_a.cont.top == info_b.cont.top && info_a.cont.bottom == info_b.cont.bottom;
 			}
 		}
 		return false;
@@ -204,6 +204,15 @@ component ExecuteOptions {
 		}
 		return false;
 	}
+	// Returns the execution strategy for a given flag, or default if not found.
+	def getModeOrDefault(name: string) -> ExecutionStrategy {
+		for (l = modes; l != null; l = l.tail) {
+			var t = l.head;
+			if (Strings.equal(t.0,name)) return t.1;
+		}
+		return default;
+	}
+
 	// Print help for the supported modes.
 	def printHelp(out: TraceBuilder) {
 		var H = out.putsln, L = out.ln;
